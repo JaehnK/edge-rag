@@ -28,14 +28,45 @@ uv run main.py \
   --dataset scifact \
   --base-url http://localhost:8000 \
   --advanced hyde \
+  --output reports/scifact-hyde.json \
   --ragas-metric Faithfulness \
   --ragas-metric ResponseRelevancy
 ```
+
+전체 Advanced RAG 모드를 동일한 query 집합으로 순차 평가하려면 고수준
+실험 스크립트를 사용합니다. Edge latency 비교의 기본값은 동시성 1입니다.
+
+```bash
+uv run python scripts/run_experiment.py \
+  --dataset scifact \
+  --data-dir /home/jaehun/playground/edge-rag-experiments/data/beir \
+  --base-url http://192.168.0.82:8000 \
+  --output-dir reports/scifact-all
+```
+
+smoke run은 `--limit`, 일부 모드만 실행할 때는 반복 가능한 `--mode`를
+사용합니다.
+
+```bash
+uv run python scripts/run_experiment.py \
+  --dataset scifact \
+  --data-dir /home/jaehun/playground/edge-rag-experiments/data/beir \
+  --base-url http://192.168.0.82:8000 \
+  --mode none \
+  --mode hyde \
+  --limit 5 \
+  --dry-run
+```
+
+각 모드의 JSON에는 query별 response, retrieved document/chunk, BEIR reference,
+서버 `trace`가 저장됩니다. `manifest.json`에는 실행 모드, evaluator commit,
+성공 여부와 로그 경로가 기록됩니다.
 
 ---
 ## GitHub Actions Automation
 - `CI and Deploy`: `push`/`pull_request`마다 테스트를 실행하고, `master`/`main` push 시 VM에 최신 코드를 반영합니다.
 - `Run Evaluation`: GitHub Actions의 `workflow_dispatch` 버튼으로 평가를 수동 실행합니다.
+  여러 advanced mode를 한 번에 실행하고 결과를 workflow artifact로 저장합니다.
 
 ### GitHub Secrets
 - `VM_HOST`: Compute Engine external IP or hostname

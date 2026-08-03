@@ -438,6 +438,7 @@ dependencies = [
     { name = "httpx" },
     { name = "numpy" },
     { name = "pandas" },
+    { name = "python-dotenv" },
     { name = "ragas" },
 ]
 
@@ -453,6 +454,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "numpy", specifier = ">=2.4.4" },
     { name = "pandas", specifier = ">=3.0.2" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "ragas" },
 ]
 

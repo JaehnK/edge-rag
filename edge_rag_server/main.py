@@ -1,9 +1,9 @@
 from src.EvalCLI import run
 
 
-def main():
-    run()
+def main() -> int:
+    return run()
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

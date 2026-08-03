@@ -12,7 +12,15 @@ class ApiAnswer:
 
     answer: str
     contexts: list[RetrievedContext] = field(default_factory=list)
+    # What retrieval returned before a mode rewrote the contexts (currently only
+    # contextual_compression). Empty when `contexts` is already the retrieval
+    # output. IR metrics must be scored against this, not the prompt contexts.
+    pre_transform_contexts: list[RetrievedContext] = field(default_factory=list)
     raw: dict = field(default_factory=dict)
+    # Client-side wall time for the HTTP round trip. The server trace excludes
+    # per-request process startup (model load), so this is the only end-to-end
+    # latency the evaluation can reconstruct.
+    client_latency_ms: float | None = None
 
     def __post_init__(self) -> None:
         """

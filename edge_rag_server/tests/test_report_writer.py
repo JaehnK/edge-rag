@@ -13,6 +13,7 @@ def test_report_writer_writes_json_and_markdown(tmp_path):
         beir_metrics={"precision@1": 0.5},
         ragas_metrics={"faithfulness": 0.75},
         record_count=2,
+        success_count=2,
     )
 
     json_path = writer.write_json(summary, filename="out.json")

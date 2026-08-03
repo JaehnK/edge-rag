@@ -18,20 +18,30 @@ on:
         required: true
         default: "test"
         type: string
-      top_k:
-        description: "Top-k contexts"
+      data_dir:
+        description: "BEIR data directory on the VM"
+        required: true
+        default: "beir_data"
+        type: string
+      advanced_modes:
+        description: "Comma-separated Advanced RAG modes"
         required: false
-        default: "5"
+        default: "none,query_rewrite,hyde,rerank,sentence_window,contextual_compression"
         type: string
       use_async:
         description: "Use async HTTP requests"
         required: true
-        default: true
+        default: false
         type: boolean
       concurrency:
         description: "Concurrency for async mode"
         required: true
-        default: "8"
+        default: "1"
+        type: string
+      limit:
+        description: "Optional query limit for smoke runs"
+        required: false
+        default: ""
         type: string
       ragas_metrics:
         description: "Comma-separated ragas metric names"
@@ -45,7 +55,7 @@ permissions:
 jobs:
   run-eval:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 360
     steps:
       - name: Validate evaluation settings
         env:
@@ -79,12 +89,15 @@ jobs:
 
       - name: Run evaluation on VM
         env:
+          ADVANCED_MODES: ${{ inputs.advanced_modes }}
           BASE_URL: ${{ inputs.base_url }}
           CONCURRENCY: ${{ inputs.concurrency }}
+          DATA_DIR: ${{ inputs.data_dir }}
           DATASET: ${{ inputs.dataset }}
+          EVAL_OUTPUT_DIR: reports/github-${{ github.run_id }}
+          LIMIT: ${{ inputs.limit }}
           RAGAS_METRICS: ${{ inputs.ragas_metrics }}
           SPLIT: ${{ inputs.split }}
-          TOP_K: ${{ inputs.top_k }}
           USE_ASYNC: ${{ inputs.use_async }}
           VM_APP_DIR: ${{ vars.VM_APP_DIR }}
           VM_HOST: ${{ secrets.VM_HOST }}
@@ -94,10 +107,10 @@ jobs:
           set -euo pipefail
           VM_APP_DIR="${VM_APP_DIR:-/home/$VM_USER/edge_rag_server}"
           VM_SSH_PORT="${VM_SSH_PORT:-22}"
-          args=(main.py --dataset "$DATASET" --base-url "$BASE_URL" --split "$SPLIT" --concurrency "$CONCURRENCY")
+          args=(python scripts/run_experiment.py --dataset "$DATASET" --data-dir "$DATA_DIR" --base-url "$BASE_URL" --split "$SPLIT" --concurrency "$CONCURRENCY" --output-dir "$EVAL_OUTPUT_DIR")
 
-          if [ -n "$TOP_K" ]; then
-            args+=(--top-k "$TOP_K")
+          if [ -n "$LIMIT" ]; then
+            args+=(--limit "$LIMIT")
           fi
 
           if [ "$USE_ASYNC" = "true" ]; then
@@ -115,6 +128,17 @@ jobs:
             done
           fi
 
+          if [ -n "$ADVANCED_MODES" ]; then
+            IFS=',' read -r -a modes <<< "$ADVANCED_MODES"
+            for mode in "${modes[@]}"; do
+              mode="${mode#"${mode%%[![:space:]]*}"}"
+              mode="${mode%"${mode##*[![:space:]]}"}"
+              if [ -n "$mode" ]; then
+                args+=(--mode "$mode")
+              fi
+            done
+          fi
+
           printf -v escaped_args ' %q' "${args[@]}"
 
           ssh -p "$VM_SSH_PORT" "$VM_USER@$VM_HOST" "
@@ -122,3 +146,28 @@ jobs:
             cd '$VM_APP_DIR'
             ~/.local/bin/uv run${escaped_args}
           "
+
+      - name: Fetch evaluation results
+        if: always()
+        env:
+          EVAL_OUTPUT_DIR: reports/github-${{ github.run_id }}
+          VM_APP_DIR: ${{ vars.VM_APP_DIR }}
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_SSH_PORT: ${{ vars.VM_SSH_PORT }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          set -euo pipefail
+          VM_APP_DIR="${VM_APP_DIR:-/home/$VM_USER/edge_rag_server}"
+          VM_SSH_PORT="${VM_SSH_PORT:-22}"
+          mkdir -p evaluation-results
+          scp -P "$VM_SSH_PORT" -r \
+            "$VM_USER@$VM_HOST:$VM_APP_DIR/$EVAL_OUTPUT_DIR/." \
+            evaluation-results/
+
+      - name: Upload evaluation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-${{ github.run_id }}
+          path: evaluation-results/
+          if-no-files-found: warn

@@ -30,8 +30,13 @@ class ReportWriter:
         """
         output_path = self._ensure_output_dir()
         file_path = output_path / filename
-        with file_path.open("w", encoding="utf-8") as file:
+        # Write atomically (tmp + replace) so an interrupted/failed dump cannot
+        # truncate a previous report into invalid JSON that a later json.loads picks
+        # up as if complete.
+        tmp_path = file_path.with_suffix(file_path.suffix + ".tmp")
+        with tmp_path.open("w", encoding="utf-8") as file:
             json.dump(asdict(summary), file, ensure_ascii=False, indent=2)
+        tmp_path.replace(file_path)
         logger.info(
             "action=write_report status=ok format=json path=%s",
             file_path,
