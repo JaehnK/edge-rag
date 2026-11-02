@@ -1,0 +1,3 @@
+[submodule "edge-rag-experiments"]
+	path = edge-rag-experiments
+	url = https://github.com/JaehnK/edge-rag-experiments.git
